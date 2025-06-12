@@ -1,0 +1,181 @@
+body {
+    font-family: 'Arial', sans-serif; /* A common font, consider a Persian-friendly font later if needed */
+    direction: rtl; /* Right-to-left for Persian */
+    margin: 0;
+    padding: 0;
+    background-color: #f0f0f0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+header {
+    background-color: #333;
+    color: white;
+    padding: 10px 0;
+    text-align: center;
+    width: 100%;
+}
+
+main {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-around;
+    width: 90%;
+    margin-top: 20px;
+}
+
+#game-board {
+    width: 600px; /* Example size */
+    height: 600px; /* Example size */
+    display: grid;
+    border: 2px solid #333;
+    /* Grid columns and rows will be set by JavaScript */
+}
+
+.grid-cell {
+    border: 1px solid #ccc;
+    display: flex;
+    flex-direction: column; /* Allow stacking text (capital) and units */
+    justify-content: center; /* Center capital name if no unit */
+    align-items: center;
+    font-size: 9px; /* Smaller for capital name if units are present */
+    text-align: center;
+    overflow: visible; /* Allow unit box-shadow to be visible */
+    position: relative; /* For potential absolute positioning of multiple units later if needed */
+}
+
+/* Add these styles to style.css */
+.grid-cell .unit {
+    margin-top: 2px; /* Add some space if there's capital text */
+}
+
+/* Capital city styles adjustments to ensure visibility with units */
+.iran-capital, .usa-capital {
+    /* Existing styles */
+    padding: 2px; /* Add some padding */
+    line-height: 1.1; /* Adjust line height for multi-line text */
+}
+
+/* Add these styles to style.css */
+.selected-unit-cell { /* Style for the cell where the selected unit IS */
+    /* background-color: #ffff99 !important; /* Light yellow, might be too strong */
+}
+
+.selected-unit-marker { /* Style for the unit element itself when selected */
+    outline: 3px solid #ffeb3b; /* Yellow outline */
+    box-shadow: 0 0 10px #ffeb3b;
+}
+
+.movable-cell {
+    background-color: rgba(144, 238, 144, 0.5) !important; /* Light green, transparent */
+    cursor: grabbing;
+}
+
+.attackable-cell {
+    background-color: rgba(255, 160, 122, 0.6) !important; /* Light salmon, transparent */
+    cursor: crosshair;
+}
+
+.attackable-cell .unit { /* Make enemy unit in attackable cell more prominent */
+    /* outline: 2px dashed red; */
+}
+
+/* Add these styles to style.css */
+#message-log-container {
+    margin-top: 20px;
+    border-top: 1px solid #eee;
+    padding-top: 10px;
+}
+
+#message-log {
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+    height: 100px; /* Example fixed height */
+    overflow-y: auto; /* Scroll for older messages */
+    background-color: #f8f8f8;
+    border: 1px solid #ddd;
+    font-size: 0.9em;
+}
+
+#message-log li {
+    padding: 5px;
+    border-bottom: 1px solid #eee;
+}
+
+#message-log li:last-child {
+    border-bottom: none;
+}
+
+.unit {
+    width: 80%;
+    height: 80%;
+    border-radius: 5px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 0.7em; /* Smaller font for unit symbols */
+    font-weight: bold;
+    cursor: pointer; /* Indicate units are clickable */
+    box-shadow: 0 0 5px rgba(0,0,0,0.3);
+}
+
+.iran-unit {
+    background-color: #228B22; /* ForestGreen */
+    color: white;
+    border: 1px solid #006400; /* DarkGreen border */
+}
+
+.usa-unit {
+    background-color: #4169E1; /* RoyalBlue */
+    color: white;
+    border: 1px solid #00008B; /* DarkBlue border */
+}
+
+.iran-capital {
+    background-color: #90ee90; /* Light green */
+    color: #003300; /* Dark green text */
+    font-weight: bold;
+}
+
+.usa-capital {
+    background-color: #add8e6; /* Light blue */
+    color: #000033; /* Dark blue text */
+    font-weight: bold;
+}
+
+#game-info {
+    width: 30%;
+    padding: 15px;
+    border: 1px solid #ccc;
+    background-color: white;
+    height: fit-content;
+}
+
+#game-info p {
+    margin: 10px 0;
+}
+
+button {
+    padding: 10px 15px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    cursor: pointer;
+    font-size: 16px;
+}
+
+button:hover {
+    background-color: #45a049;
+}
+
+footer {
+    margin-top: 30px;
+    padding: 15px 0;
+    text-align: center;
+    width: 100%;
+    background-color: #333;
+    color: white;
+    font-size: 0.9em;
+}
