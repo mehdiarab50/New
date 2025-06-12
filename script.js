@@ -7,6 +7,8 @@ const gameBoardElement = document.getElementById('game-board');
 const turnInfoElement = document.getElementById('turn-info');
 const selectedUnitInfoElement = document.getElementById('selected-unit-info');
 const endTurnButton = document.getElementById('end-turn-button');
+// const endTurnButton = document.getElementById('end-turn-button'); // Should already exist
+const newGameButton = document.getElementById('new-game-button'); // New
 const messageLogElement = document.getElementById('message-log'); // For UI message log
 
 // Game State Variables
@@ -29,6 +31,11 @@ let selectedUnit = null;
 let gamePhase = "unitSelection"; // "unitSelection", "unitMovement", "unitAttack"
 
 const MAX_LOG_MESSAGES = 15; // Increased slightly for more debug history
+
+// Add with other global game state variables
+let tutorialStep1Done = false;
+let tutorialStep2Done = false;
+let tutorialStep3Done = false;
 
 // --- Utility Functions ---
 function getUnitAt(row, col) {
@@ -208,12 +215,17 @@ function selectUnit(unit) {
             selectedUnit = unit;
             gamePhase = "unitMovement";
             logMessage(`selectUnit: Unit ID ${unit.id} (${unit.type.name}) selected. Game phase: ${gamePhase}.`);
+            // Show T2 tutorial message after first successful selection
+            if (currentPlayer === PLAYER_IRAN) { // Optional: only show for Iran's first selection
+                showTutorialMessage('T2');
+            }
         } else {
             logMessage(`selectUnit: Attempted to select unit ID ${unit.id} not belonging to current player ${currentPlayer}. Deselecting previous if any.`);
             selectedUnit = null;
             gamePhase = "unitSelection";
         }
     } else {
+        // ... (existing code for null unit) ...
         logMessage("selectUnit: Called with null. Deselecting unit.");
         selectedUnit = null;
         gamePhase = "unitSelection";
@@ -298,6 +310,9 @@ function moveUnit(unit, targetRow, targetCol) {
 
     logMessage(`moveUnit: Deselecting unit ID ${unit.id}.`);
     selectUnit(null);
+
+    // Show T3 tutorial message
+    showTutorialMessage('T3');
     return true;
 }
 
@@ -355,6 +370,9 @@ function attackUnit(attacker, defender) {
 
     logMessage(`attackUnit: Deselecting unit ID ${attacker.id}.`);
     selectUnit(null);
+
+    // Show T3 tutorial message
+    showTutorialMessage('T3');
     return true;
 }
 
@@ -452,14 +470,92 @@ function onCellClick(row, col) {
     updateSelectedUnitInfo();
 }
 
+// Define the resetGame function
+function resetGame() {
+    logMessage("--- شروع بازی جدید ---");
+
+    // Reset game state variables
+    currentPlayer = PLAYER_IRAN;
+    selectedUnit = null;
+    gamePhase = "unitSelection";
+
+    // Re-initialize units (positions, HP, flags)
+    initializeUnits();
+    // Re-initialize map data (in case capitals were marked differently, though not currently)
+    // initializeMapData(); // Assuming capitals don't change ownership visually on mapData itself.
+                           // If they do, uncomment this. For now, unit positions on capitals matter.
+
+    // Clear the message log
+    if (messageLogElement) {
+        messageLogElement.innerHTML = '';
+    }
+    // logMessage("بازی جدید شروع شد. نوبت ایران."); // This will be covered by tutorial step 1
+
+    // Reset UI elements
+    if (turnInfoElement) {
+        turnInfoElement.textContent = `نوبت ${PLAYER_IRAN}`;
+    }
+    updateSelectedUnitInfo(); // Clears selected unit info
+
+    if (gameBoardElement) {
+        gameBoardElement.style.pointerEvents = 'auto'; // Re-enable board clicks
+    }
+    if (endTurnButton) {
+        endTurnButton.disabled = false; // Re-enable end turn button
+    }
+
+    // Reset tutorial flags
+    tutorialStep1Done = false;
+    tutorialStep2Done = false;
+    tutorialStep3Done = false;
+
+    renderMap();
+    logMessage("نقشه و واحدها بازنشانی شدند. بازی جدید شروع شد."); // Combined message
+
+    // Show initial tutorial message
+    showTutorialMessage('T1');
+}
+
+// Create `showTutorialMessage()` function:
+function showTutorialMessage(step) {
+    switch(step) {
+        case 'T1':
+            if (!tutorialStep1Done) {
+                logMessage("راهنما (۱): نوبت ایران. برای انتخاب واحد روی آن کلیک کنید. خانه‌های سبز مسیر حرکت و خانه‌های قرمز دشمنِ قابل حمله را نشان می‌دهند.");
+                tutorialStep1Done = true;
+            }
+            break;
+        case 'T2':
+            if (!tutorialStep2Done) {
+                logMessage("راهنما (۲): واحد انتخاب شد! برای حرکت روی خانه سبز رنگ یا برای حمله به دشمن (در خانه قرمز رنگ) کلیک کنید.");
+                tutorialStep2Done = true;
+            }
+            break;
+        case 'T3':
+            if (!tutorialStep3Done) {
+                logMessage("راهنما (۳): حرکت/حمله انجام شد! پس از اتمام تمام عملیات، روی 'پایان نوبت' کلیک کنید.");
+                tutorialStep3Done = true;
+            }
+            break;
+    }
+}
+
 // --- DOMContentLoaded ---
+// Modify DOMContentLoaded
 document.addEventListener('DOMContentLoaded', () => {
+    // ... (existing critical DOM element checks)
     if (!gameBoardElement || !turnInfoElement || !selectedUnitInfoElement || !endTurnButton || !messageLogElement) {
         console.error("CRITICAL DOM SETUP ERROR: Essential game elements missing.");
         alert("خطای بارگذاری بازی! عناصر اصلی صفحه موجود نیستند.");
         // Attempt to log to messageLog if it exists, otherwise, it's a lost cause.
         if(typeof logMessage === "function") logMessage("خطای بسیار جدی: عناصر HTML اصلی بازی یافت نشدند!");
         return;
+    }
+    if (!newGameButton) { // Add check for the new button
+        console.error("CRITICAL DOM SETUP ERROR: newGameButton element is missing!");
+        if(typeof logMessage === "function") logMessage("خطای بارگذاری: دکمه بازی جدید یافت نشد!");
+        // alert("خطای بارگذاری: دکمه بازی جدید یافت نشد!"); // Alert might be too intrusive if other things load
+        // No return here, as game might still be playable without new game button initially
     }
 
     logMessage("بازی در حال بارگذاری اولیه...");
@@ -468,17 +564,28 @@ document.addEventListener('DOMContentLoaded', () => {
     renderMap();
 
     const initialTurnText = `نوبت ${PLAYER_IRAN}`;
-    turnInfoElement.textContent = initialTurnText;
+    if(turnInfoElement) turnInfoElement.textContent = initialTurnText;
     logMessage(`--- ${initialTurnText} ---`);
     updateSelectedUnitInfo();
 
-    endTurnButton.addEventListener('click', () => {
-        if (currentPlayer === null) {
-             logMessage("endTurnButton: Game has ended.");
-             return;
-        }
-        logMessage(`${currentPlayer} نوبت خود را به پایان رساند.`);
-        switchTurn();
-    });
+    if(endTurnButton) {
+        endTurnButton.addEventListener('click', () => {
+            if (currentPlayer === null) {
+                 logMessage("endTurnButton: Game has ended.");
+                 return;
+            }
+            logMessage(`${currentPlayer} نوبت خود را به پایان رساند.`);
+            switchTurn();
+        });
+    }
+
+    if(newGameButton) { // Attach listener if button exists
+        newGameButton.addEventListener('click', resetGame);
+    }
+
     logMessage("بازی با موفقیت بارگذاری و آماده شد.");
+    // Call for initial tutorial message (will be part of next step)
+    // showTutorialMessage("initial");
+    logMessage("بازی با موفقیت بارگذاری و آماده شد.");
+    showTutorialMessage('T1'); // Show initial tutorial message after everything is ready
 });
