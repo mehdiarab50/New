@@ -1,280 +1,125 @@
-// Add these at the top of script.js
+// Constants for Map
 const MAP_ROWS = 10;
 const MAP_COLS = 10;
 
-// Add near the top with other constants
+// DOM Elements
+const gameBoardElement = document.getElementById('game-board');
+const turnInfoElement = document.getElementById('turn-info');
+const selectedUnitInfoElement = document.getElementById('selected-unit-info');
+const endTurnButton = document.getElementById('end-turn-button');
+const messageLogElement = document.getElementById('message-log'); // For UI message log
+
+// Game State Variables
+let mapData = [];
+const IRAN_CAPITAL = { row: Math.floor(MAP_ROWS / 2), col: 1 };
+const USA_CAPITAL = { row: Math.floor(MAP_ROWS / 2), col: MAP_COLS - 2 };
+
 const UNIT_TYPES = {
     INFANTRY: { name: "پیاده", attack: 5, defense: 3, maxHp: 10, movement: 3, symbol: "Inf" },
     TANK: { name: "تانک", attack: 8, defense: 7, maxHp: 15, movement: 2, symbol: "Tnk" }
 };
-
 const PLAYER_IRAN = "Iran";
 const PLAYER_USA = "USA";
 
-// Add these global variables at the top of script.js
-let currentPlayer = PLAYER_IRAN;
-let selectedUnit = null; // Will store the currently selected unit object
-let gamePhase = "unitSelection"; // "unitSelection", "unitMovement", "unitAttack"
-
-// Ensure existing global variables like MAP_ROWS, MAP_COLS, gameBoardElement, etc., are present.
-// Ensure UNIT_TYPES, PLAYER_IRAN, PLAYER_USA, units, nextUnitId, IRAN_CAPITAL, USA_CAPITAL are defined.
-
-// Add this global variable at the top of script.js
-const messageLogElement = document.getElementById('message-log');
-const MAX_LOG_MESSAGES = 10; // Max messages to keep in log
-
-// Function to add a message to the game log
-function logMessage(message) {
-    const listItem = document.createElement('li');
-    listItem.textContent = message;
-    messageLogElement.prepend(listItem); // Add new messages to the top
-
-    // Keep the log from getting too long
-    while (messageLogElement.children.length > MAX_LOG_MESSAGES) {
-        messageLogElement.removeChild(messageLogElement.lastChild);
-    }
-    console.log(`LOG: ${message}`); // Keep console logging as well for debugging
-}
-
-// --- Modify existing functions to use logMessage ---
-
-// Example in switchTurn:
-let units = []; // Array to store all active unit objects
+let units = [];
 let nextUnitId = 0;
 
-// Add these variables near mapData and capitals
-// Capital positions (ensure these are defined, from previous step)
-// const IRAN_CAPITAL = { row: Math.floor(MAP_ROWS / 2), col: 1 };
-// const USA_CAPITAL = { row: Math.floor(MAP_ROWS / 2), col: MAP_COLS - 2 };
+let currentPlayer = PLAYER_IRAN;
+let selectedUnit = null;
+let gamePhase = "unitSelection"; // "unitSelection", "unitMovement", "unitAttack"
 
+const MAX_LOG_MESSAGES = 15; // Increased slightly for more debug history
 
-// --- Helper Functions ---
+// --- Utility Functions ---
 function getUnitAt(row, col) {
     return units.find(u => u.row === row && u.col === col);
 }
 
 function getDistance(unit, targetRow, targetCol) {
-    return Math.abs(unit.row - targetRow) + Math.abs(unit.col - targetCol); // Manhattan distance
+    return Math.abs(unit.row - targetRow) + Math.abs(unit.col - targetCol);
 }
 
-// --- Turn Management ---
-// Example in switchTurn:
-function switchTurn() {
-    currentPlayer = (currentPlayer === PLAYER_IRAN) ? PLAYER_USA : PLAYER_IRAN;
-    const currentTurnText = `نوبت ${currentPlayer === PLAYER_IRAN ? 'ایران' : 'آمریکا'}`;
-    turnInfoElement.textContent = currentTurnText;
-    logMessage(`--- ${currentTurnText} ---`); // Log turn change
-    selectedUnit = null;
-    gamePhase = "unitSelection";
-    updateSelectedUnitInfo();
-
-    units.forEach(unit => {
-        if (unit.owner === currentPlayer) {
-            unit.movedThisTurn = false;
-            unit.attackedThisTurn = false;
+// --- Logging Function ---
+function logMessage(message) {
+    const listItem = document.createElement('li');
+    listItem.textContent = message;
+    if (messageLogElement) { // Check if element exists, for robustness
+        messageLogElement.prepend(listItem);
+        while (messageLogElement.children.length > MAX_LOG_MESSAGES) {
+            messageLogElement.removeChild(messageLogElement.lastChild);
         }
-    });
-    checkForWin();
-    renderMap(); // Moved renderMap here to ensure highlights are cleared AFTER turn switch logic
+    }
+    console.log(`LOG: ${message}`); // Keep console log for dev debugging
 }
 
-// --- Unit Selection ---
-function selectUnit(unit) {
-    if (unit && unit.owner === currentPlayer) {
-        selectedUnit = unit;
-        gamePhase = "unitMovement"; // Or "unitAttack" if preferred to show options first
-        console.log(`Unit selected: ${selectedUnit.type.name} at (${selectedUnit.row}, ${selectedUnit.col})`);
+
+// --- Map Initialization ---
+function initializeMapData() {
+    mapData = [];
+    for (let r = 0; r < MAP_ROWS; r++) {
+        const row = [];
+        for (let c = 0; c < MAP_COLS; c++) {
+            row.push(0);
+        }
+        mapData.push(row);
+    }
+    // Ensure mapData is large enough before setting capitals
+    if (IRAN_CAPITAL.row < MAP_ROWS && IRAN_CAPITAL.col < MAP_COLS && mapData[IRAN_CAPITAL.row]) {
+      mapData[IRAN_CAPITAL.row][IRAN_CAPITAL.col] = 1;
     } else {
-        selectedUnit = null;
-        gamePhase = "unitSelection";
+      console.error("Error setting Iran capital: Position out of bounds or mapData not initialized correctly for row " + IRAN_CAPITAL.row);
+      logMessage("خطا در تنظیم پایتخت ایران: موقعیت نامعتبر.");
     }
-    updateSelectedUnitInfo();
-}
-
-function updateSelectedUnitInfo() {
-    if (selectedUnit) {
-        selectedUnitInfoElement.textContent = `واحد انتخاب شده: ${selectedUnit.type.name} (${selectedUnit.owner}) HP: ${selectedUnit.hp}/${selectedUnit.type.maxHp} | حرکت: ${selectedUnit.movedThisTurn} | حمله: ${selectedUnit.attackedThisTurn}`;
+    if (USA_CAPITAL.row < MAP_ROWS && USA_CAPITAL.col < MAP_COLS && mapData[USA_CAPITAL.row]) {
+      mapData[USA_CAPITAL.row][USA_CAPITAL.col] = 2;
     } else {
-        selectedUnitInfoElement.textContent = "واحد انتخاب شده: -";
+      console.error("Error setting USA capital: Position out of bounds or mapData not initialized correctly for row " + USA_CAPITAL.row);
+      logMessage("خطا در تنظیم پایتخت آمریکا: موقعیت نامعتبر.");
     }
 }
 
-// --- Movement Logic ---
-// Example in moveUnit (for invalid move):
-function canMoveTo(unit, targetRow, targetCol) {
-    if (unit.movedThisTurn) return false;
-    const distance = getDistance(unit, targetRow, targetCol);
-    if (distance === 0 || distance > unit.type.movement) return false;
-    if (targetRow < 0 || targetRow >= MAP_ROWS || targetCol < 0 || targetCol >= MAP_COLS) return false; // Off map
-    const targetCellUnit = getUnitAt(targetRow, targetCol);
-    if (targetCellUnit && targetCellUnit.owner === unit.owner) return false; // Cannot move to friendly occupied cell
-    // Allow moving into enemy occupied cell for attack, or empty cell
-    return true;
-}
-
-function moveUnit(unit, targetRow, targetCol) {
-    if (!canMoveTo(unit, targetRow, targetCol)) {
-        logMessage("حرکت نامعتبر است."); // Log invalid move
-        return false;
-    }
-
-    const enemyInCell = getUnitAt(targetRow, targetCol);
-    if (enemyInCell && enemyInCell.owner !== unit.owner) {
-        logMessage("سلول توسط دشمن اشغال شده. ابتدا باید حمله کنید."); // Log cell occupied by enemy
-        return false;
-    }
-
-    const prevPos = {row: unit.row, col: unit.col}; // Store previous position for logging
-    unit.row = targetRow;
-    unit.col = targetCol;
-    unit.movedThisTurn = true;
-    logMessage(`${unit.type.name} ${unit.owner} از (${prevPos.row},${prevPos.col}) به (${targetRow},${targetCol}) حرکت کرد.`);
-
-    renderMap();
-    updateSelectedUnitInfo();
-    checkForWin();
-    // After move, deselect or allow further action based on rules
-    selectUnit(null); // Deselect after move for now
-    return true;
-}
-
-// --- Combat Logic ---
-// Example in attackUnit:
-function canAttack(attacker, defender) {
-    if (!attacker || !defender || attacker.attackedThisTurn || attacker.owner === defender.owner) return false;
-    const distance = getDistance(attacker, defender.row, defender.col);
-    // Basic melee attack: distance of 1. Can be expanded for ranged units.
-    return distance === 1;
-}
-
-function attackUnit(attacker, defender) {
-    if (!canAttack(attacker, defender)) {
-        logMessage("امکان حمله به این هدف وجود ندارد.");
-        return false;
-    }
-
-    logMessage(`${attacker.type.name} ${attacker.owner} به ${defender.type.name} ${defender.owner} حمله می‌کند.`);
-
-    let damage = Math.max(1, attacker.type.attack - defender.type.defense);
-    defender.hp -= damage;
-    logMessage(`${defender.type.name} ${defender.owner} ${damage} آسیب دید. HP باقی‌مانده: ${defender.hp}`);
-
-    attacker.attackedThisTurn = true;
-    attacker.movedThisTurn = true;
-
-    if (defender.hp <= 0) {
-        logMessage(`${defender.type.name} ${defender.owner} نابود شد!`);
-        units = units.filter(u => u.id !== defender.id);
-    }
-
-    renderMap();
-    updateSelectedUnitInfo();
-    checkForWin();
-    // After attack, deselect or allow further action
-    selectUnit(null); // Deselect after attack for now
-    return true;
-}
-
-// --- Win Condition ---
-// In checkForWin, replace alert with logMessage for the winner announcement,
-// but keep the game disabling logic. The alert is quite intrusive.
-function checkForWin() {
-    let winner = null;
-    // Check if Iran's capital is occupied by USA
-    const usaUnitOnIranCapital = units.find(u => u.owner === PLAYER_USA && u.row === IRAN_CAPITAL.row && u.col === IRAN_CAPITAL.col);
-    if (usaUnitOnIranCapital) {
-        winner = PLAYER_USA;
-    }
-
-    // Check if USA's capital is occupied by Iran
-    const iranUnitOnUsaCapital = units.find(u => u.owner === PLAYER_IRAN && u.row === USA_CAPITAL.row && u.col === USA_CAPITAL.col);
-    if (iranUnitOnUsaCapital) {
-        winner = PLAYER_IRAN;
-    }
-
-    // Also consider if one side has no units left (optional win condition)
-    // const iranUnitsLeft = units.some(u => u.owner === PLAYER_IRAN);
-    // const usaUnitsLeft = units.some(u => u.owner === PLAYER_USA);
-    // if (!iranUnitsLeft && usaUnitsLeft) winner = PLAYER_USA;
-    // if (!usaUnitsLeft && iranUnitsLeft) winner = PLAYER_IRAN;
-
-
-    if (winner) {
-        // Delay alert slightly to allow map to re-render if a unit just moved/died
-        setTimeout(() => {
-            alert(`بازی تمام شد! ${winner === PLAYER_IRAN ? 'ایران' : 'آمریکا'} پیروز شد!`);
-            // Disable further actions
-            gameBoardElement.style.pointerEvents = 'none';
-            endTurnButton.disabled = true;
-            turnInfoElement.textContent = `برنده: ${winner === PLAYER_IRAN ? 'ایران' : 'آمریکا'}`;
-        }, 100); // 100ms delay
-        return true;
-    }
-    return false;
-}
-
-
-// --- Event Handling ---
-// Modify renderMap to add click listeners to cells
-const gameBoardElement = document.getElementById('game-board');
-const turnInfoElement = document.getElementById('turn-info');
-const selectedUnitInfoElement = document.getElementById('selected-unit-info');
-const endTurnButton = document.getElementById('end-turn-button');
-
-// Represents the game map. 0 = empty, 1 = Iran capital, 2 = USA capital
-// We can extend this later for terrain, etc.
-let mapData = [];
-
-// Capital positions
-const IRAN_CAPITAL = { row: Math.floor(MAP_ROWS / 2), col: 1 }; // Example: Mid-left
-const USA_CAPITAL = { row: Math.floor(MAP_ROWS / 2), col: MAP_COLS - 2 }; // Example: Mid-right
-
+// --- Unit Initialization ---
 function createUnit(type, owner, row, col) {
+    // Basic check for position being within map bounds
+    if (row < 0 || row >= MAP_ROWS || col < 0 || col >= MAP_COLS) {
+        logMessage(`خطا: تلاش برای ایجاد واحد ${type.name} خارج از نقشه در (${row},${col}).`);
+        console.error(`Error: Attempt to create unit ${type.name} off-map at (${row},${col}).`);
+        return null; // Do not create the unit
+    }
     const unit = {
         id: nextUnitId++,
-        type: type, // e.g., UNIT_TYPES.INFANTRY
-        owner: owner, // e.g., PLAYER_IRAN
+        type: type,
+        owner: owner,
         hp: type.maxHp,
         row: row,
         col: col,
-        movedThisTurn: false, // To track if unit has moved
-        attackedThisTurn: false // To track if unit has attacked
+        movedThisTurn: false,
+        attackedThisTurn: false
     };
     units.push(unit);
     return unit;
 }
 
 function initializeUnits() {
-    units = []; // Clear existing units
+    units = [];
     nextUnitId = 0;
-
-    // Iran's units (example placement)
+    // Iran's units
     createUnit(UNIT_TYPES.INFANTRY, PLAYER_IRAN, IRAN_CAPITAL.row, IRAN_CAPITAL.col + 1);
     createUnit(UNIT_TYPES.INFANTRY, PLAYER_IRAN, IRAN_CAPITAL.row + 1, IRAN_CAPITAL.col + 1);
-    createUnit(UNIT_TYPES.TANK, PLAYER_IRAN, IRAN_CAPITAL.row -1 , IRAN_CAPITAL.col + 1 );
-
-    // USA's units (example placement)
+    createUnit(UNIT_TYPES.TANK, PLAYER_IRAN, IRAN_CAPITAL.row - 1, IRAN_CAPITAL.col + 1);
+    // USA's units
     createUnit(UNIT_TYPES.INFANTRY, PLAYER_USA, USA_CAPITAL.row, USA_CAPITAL.col - 1);
     createUnit(UNIT_TYPES.INFANTRY, PLAYER_USA, USA_CAPITAL.row + 1, USA_CAPITAL.col - 1);
     createUnit(UNIT_TYPES.TANK, PLAYER_USA, USA_CAPITAL.row - 1, USA_CAPITAL.col - 1);
 }
 
-function initializeMapData() {
-    mapData = []; // Clear previous map data if any
-    for (let r = 0; r < MAP_ROWS; r++) {
-        const row = [];
-        for (let c = 0; c < MAP_COLS; c++) {
-            row.push(0); // Initialize all cells as empty
-        }
-        mapData.push(row);
-    }
-    // Set capitals
-    mapData[IRAN_CAPITAL.row][IRAN_CAPITAL.col] = 1; // Mark Iran's capital
-    mapData[USA_CAPITAL.row][USA_CAPITAL.col] = 2; // Mark USA's capital
-}
-
+// --- Rendering ---
 function renderMap() {
-    gameBoardElement.innerHTML = ''; // Clear previous map
+    if (!gameBoardElement) {
+        console.error("renderMap: gameBoardElement is null. Aborting render.");
+        return;
+    }
+    gameBoardElement.innerHTML = '';
     gameBoardElement.style.gridTemplateColumns = `repeat(${MAP_COLS}, 1fr)`;
     gameBoardElement.style.gridTemplateRows = `repeat(${MAP_ROWS}, 1fr)`;
 
@@ -285,41 +130,355 @@ function renderMap() {
             cell.dataset.row = r;
             cell.dataset.col = c;
 
-            // Display capital
-            if (mapData[r][c] === 1) { // Iran Capital
+            // Highlights
+            if (selectedUnit) {
+                if (selectedUnit.row === r && selectedUnit.col === c) {
+                    // cell.classList.add('selected-unit-cell');
+                }
+                // Use isHighlighting = true for canMoveTo and canAttack during rendering
+                if (!selectedUnit.movedThisTurn && canMoveTo(selectedUnit, r, c, true)) {
+                    const unitInTargetCell = getUnitAt(r,c);
+                    if (!unitInTargetCell) { // Only highlight empty cells for movement
+                        cell.classList.add('movable-cell');
+                    }
+                }
+                if (!selectedUnit.attackedThisTurn) {
+                    const unitInTargetCell = getUnitAt(r,c);
+                    if(unitInTargetCell && unitInTargetCell.owner !== selectedUnit.owner && canAttack(selectedUnit, unitInTargetCell, true)){
+                        cell.classList.add('attackable-cell');
+                    }
+                }
+            }
+
+            // Capitals
+            if (mapData[r] && mapData[r][c] === 1) {
                 cell.classList.add('iran-capital');
-                cell.innerHTML = 'پایتخت<br>ایران'; // Use innerHTML for line break
-            } else if (mapData[r][c] === 2) { // USA Capital
+                cell.innerHTML = 'پایتخت<br>ایران';
+            } else if (mapData[r] && mapData[r][c] === 2) {
                 cell.classList.add('usa-capital');
                 cell.innerHTML = 'پایتخت<br>آمریکا';
             }
 
-            // Display units in this cell
+            // Units
             const unitsInCell = units.filter(u => u.row === r && u.col === c);
             unitsInCell.forEach(unit => {
                 const unitElement = document.createElement('div');
                 unitElement.classList.add('unit');
                 unitElement.classList.add(unit.owner === PLAYER_IRAN ? 'iran-unit' : 'usa-unit');
-                unitElement.textContent = unit.type.symbol; // e.g., "Inf" or "Tnk"
-                unitElement.title = `${unit.type.name} (${unit.owner}) HP: ${unit.hp}/${unit.type.maxHp}`;
+                if (selectedUnit && selectedUnit.id === unit.id) {
+                    unitElement.classList.add('selected-unit-marker');
+                }
+                unitElement.textContent = unit.type.symbol;
+                unitElement.title = `${unit.type.name} (${unit.owner}) HP: ${unit.hp}/${unit.type.maxHp} | M:${unit.movedThisTurn} A:${unit.attackedThisTurn}`;
                 cell.appendChild(unitElement);
             });
 
-            // Add click listener for cell selection (will be detailed in Core Game Logic)
-            // cell.addEventListener('click', () => onCellClick(r, c));
-
+            cell.addEventListener('click', () => onCellClick(r, c));
             gameBoardElement.appendChild(cell);
         }
     }
 }
 
-// Update DOMContentLoaded
-document.addEventListener('DOMContentLoaded', () => {
-    console.log("بازی بارگذاری شد. آماده برای شروع!");
-    initializeMapData();
-    initializeUnits(); // Call this new function
-    renderMap();
-    turnInfoElement.textContent = "نوبت ایران"; // Starting player
-});
+// --- Game Logic: Turn Management ---
+function switchTurn() {
+    currentPlayer = (currentPlayer === PLAYER_IRAN) ? PLAYER_USA : PLAYER_IRAN;
+    const currentTurnText = `نوبت ${currentPlayer === PLAYER_IRAN ? 'ایران' : 'آمریکا'}`;
+    if(turnInfoElement) turnInfoElement.textContent = currentTurnText;
+    logMessage(`--- ${currentTurnText} ---`);
 
-// More game logic will be added later
+    selectedUnit = null;
+    gamePhase = "unitSelection";
+    updateSelectedUnitInfo();
+
+    units.forEach(unit => {
+        if (unit.owner === currentPlayer) {
+            unit.movedThisTurn = false;
+            unit.attackedThisTurn = false;
+        }
+    });
+
+    if(checkForWin()) return;
+    renderMap();
+}
+
+// --- Game Logic: Selection ---
+function selectUnit(unit) {
+    if (unit) {
+        if (unit.owner === currentPlayer) {
+            selectedUnit = unit;
+            gamePhase = "unitMovement";
+            logMessage(`selectUnit: Unit ID ${unit.id} (${unit.type.name}) selected. Game phase: ${gamePhase}.`);
+        } else {
+            logMessage(`selectUnit: Attempted to select unit ID ${unit.id} not belonging to current player ${currentPlayer}. Deselecting previous if any.`);
+            selectedUnit = null;
+            gamePhase = "unitSelection";
+        }
+    } else {
+        logMessage("selectUnit: Called with null. Deselecting unit.");
+        selectedUnit = null;
+        gamePhase = "unitSelection";
+    }
+}
+
+function updateSelectedUnitInfo() {
+    if (!selectedUnitInfoElement) return;
+    if (selectedUnit) {
+        selectedUnitInfoElement.textContent = `واحد انتخاب شده: ${selectedUnit.type.name} (${selectedUnit.owner}) HP: ${selectedUnit.hp}/${selectedUnit.type.maxHp} | حرکت: ${selectedUnit.movedThisTurn} | حمله: ${selectedUnit.attackedThisTurn}`;
+    } else {
+        selectedUnitInfoElement.textContent = "واحد انتخاب شده: -";
+    }
+}
+
+// --- Game Logic: Movement ---
+function canMoveTo(unit, targetRow, targetCol, isHighlighting = false) {
+    const logFn = isHighlighting ? () => {} : logMessage; // Simplified: no console log for highlighting pass
+
+    if (!isHighlighting) logFn(`canMoveTo: Unit ID ${unit.id} to (${targetRow},${targetCol}). Moved: ${unit.movedThisTurn}`);
+
+    if (unit.movedThisTurn) {
+        if (!isHighlighting) logFn("canMoveTo: FAILED - unit.movedThisTurn is true.");
+        return false;
+    }
+
+    const distance = getDistance(unit, targetRow, targetCol);
+    if (!isHighlighting) logFn(`canMoveTo: Dist: ${distance}, MaxMove: ${unit.type.movement}`);
+    if (distance === 0) {
+        if (!isHighlighting) logFn("canMoveTo: FAILED - distance is 0.");
+        return false;
+    }
+    if (distance > unit.type.movement) {
+        if (!isHighlighting) logFn("canMoveTo: FAILED - distance > movement.");
+        return false;
+    }
+
+    if (!isHighlighting) logFn(`canMoveTo: Target (${targetRow},${targetCol}). Map: ${MAP_ROWS}x${MAP_COLS}`);
+    if (targetRow < 0 || targetRow >= MAP_ROWS || targetCol < 0 || targetCol >= MAP_COLS) {
+        if (!isHighlighting) logFn("canMoveTo: FAILED - target off map.");
+        return false;
+    }
+
+    const targetCellUnit = getUnitAt(targetRow, targetCol);
+    if (targetCellUnit) {
+        if (!isHighlighting) logFn(`canMoveTo: Target cell has unit ID ${targetCellUnit.id}, Owner: ${targetCellUnit.owner}.`);
+        if (targetCellUnit.owner === unit.owner) {
+            if (!isHighlighting) logFn("canMoveTo: FAILED - target cell occupied by friendly unit.");
+            return false;
+        }
+        if (!isHighlighting) logFn("canMoveTo: Target cell has enemy. (Move allowed by canMoveTo, moveUnit must check).");
+    } else {
+        if (!isHighlighting) logFn("canMoveTo: Target cell is empty.");
+    }
+
+    if (!isHighlighting) logFn("canMoveTo: PASSED.");
+    return true;
+}
+
+function moveUnit(unit, targetRow, targetCol) {
+    logMessage(`moveUnit: Unit ID ${unit.id} from (${unit.row},${unit.col}) to (${targetRow},${targetCol}).`);
+    if (!canMoveTo(unit, targetRow, targetCol, false)) {
+        logMessage("moveUnit: Initial canMoveTo FAILED."); // Reasons logged by canMoveTo
+        return false;
+    }
+
+    const targetUnit = getUnitAt(targetRow, targetCol);
+    if (targetUnit && targetUnit.owner !== unit.owner) { // Check if target has an ENEMY unit
+        logMessage(`moveUnit: FAILED - Target cell (${targetRow},${targetCol}) occupied by enemy ID ${targetUnit.id}. Use Attack.`);
+        return false;
+    }
+    // If targetUnit is friendly, canMoveTo would have returned false.
+    // If targetUnit is null (empty), this condition is false.
+
+    const prevPos = {row: unit.row, col: unit.col};
+    unit.row = targetRow;
+    unit.col = targetCol;
+    unit.movedThisTurn = true;
+    logMessage(`moveUnit: SUCCESS - Unit ID ${unit.id} (${unit.type.name}) moved from (${prevPos.row},${prevPos.col}) to (${unit.row},${unit.col}). Moved: ${unit.movedThisTurn}.`);
+
+    if(checkForWin()) return true;
+
+    logMessage(`moveUnit: Deselecting unit ID ${unit.id}.`);
+    selectUnit(null);
+    return true;
+}
+
+// --- Game Logic: Combat ---
+function canAttack(attacker, defender, isHighlighting = false) {
+    const logFn = isHighlighting ? () => {} : logMessage;
+    if(!isHighlighting) logFn(`canAttack: Attacker ID ${attacker.id} vs Defender ID ${defender.id}. AttackedThisTurn: ${attacker.attackedThisTurn}`);
+
+    if (!attacker || !defender) {
+        if(!isHighlighting) logFn("canAttack: FAILED - attacker or defender is null.");
+        return false;
+    }
+    if (attacker.attackedThisTurn) {
+        if(!isHighlighting) logFn("canAttack: FAILED - attacker.attackedThisTurn.");
+        return false;
+    }
+    if (attacker.owner === defender.owner) {
+        if(!isHighlighting) logFn("canAttack: FAILED - same owner.");
+        return false;
+    }
+
+    const distance = getDistance(attacker, defender.row, defender.col);
+    if(!isHighlighting) logFn(`canAttack: Distance: ${distance}. Required: 1.`);
+    if (distance !== 1) {
+        if(!isHighlighting) logFn("canAttack: FAILED - distance not 1.");
+        return false;
+    }
+
+    if(!isHighlighting) logFn("canAttack: PASSED.");
+    return true;
+}
+
+function attackUnit(attacker, defender) {
+    logMessage(`attackUnit: Unit ID ${attacker.id} (${attacker.type.name}) attacks ID ${defender.id} (${defender.type.name}).`);
+    if (!canAttack(attacker, defender, false)) {
+        logMessage("attackUnit: canAttack FAILED."); // Reasons logged by canAttack
+        return false;
+    }
+
+    logMessage(`${attacker.type.name} (Att:${attacker.type.attack},HP:${attacker.hp}) vs ${defender.type.name} (Def:${defender.type.defense},HP:${defender.hp})`);
+
+    let damage = Math.max(1, attacker.type.attack - defender.type.defense);
+    defender.hp -= damage;
+    logMessage(`${defender.type.name} ${defender.owner} takes ${damage} damage. HP left: ${defender.hp}`);
+
+    attacker.attackedThisTurn = true;
+    attacker.movedThisTurn = true;
+
+    if (defender.hp <= 0) {
+        logMessage(`${defender.type.name} ${defender.owner} destroyed!`);
+        units = units.filter(u => u.id !== defender.id);
+    }
+
+    if(checkForWin()) return true;
+
+    logMessage(`attackUnit: Deselecting unit ID ${attacker.id}.`);
+    selectUnit(null);
+    return true;
+}
+
+// --- Game Logic: Win Condition ---
+function checkForWin() {
+    if (currentPlayer === null) return true; // Game already ended and processed
+
+    let winner = null;
+    const usaUnitOnIranCapital = units.find(u => u.owner === PLAYER_USA && u.row === IRAN_CAPITAL.row && u.col === IRAN_CAPITAL.col);
+    if (usaUnitOnIranCapital) {
+        winner = PLAYER_USA;
+    }
+
+    const iranUnitOnUsaCapital = units.find(u => u.owner === PLAYER_IRAN && u.row === USA_CAPITAL.row && u.col === USA_CAPITAL.col);
+    if (iranUnitOnUsaCapital && !winner) { // Check !winner to avoid double message if both happen same time (unlikely)
+        winner = PLAYER_IRAN;
+    }
+
+    if (winner) {
+        const winMessage = `بازی تمام شد! ${winner === PLAYER_IRAN ? 'ایران' : 'آمریکا'} پیروز شد!`;
+        logMessage(winMessage);
+        if(gameBoardElement) gameBoardElement.style.pointerEvents = 'none';
+        if(endTurnButton) endTurnButton.disabled = true;
+        if(turnInfoElement) turnInfoElement.textContent = `برنده: ${winner === PLAYER_IRAN ? 'ایران' : 'آمریکا'}`;
+        currentPlayer = null; // Mark game as ended
+        selectedUnit = null; // Clear selection
+        return true;
+    }
+    return false;
+}
+
+// --- Event Handling ---
+function onCellClick(row, col) {
+    if (currentPlayer === null) {
+        logMessage("onCellClick: Game has ended. No actions allowed.");
+        return;
+    }
+
+    logMessage(`onCellClick: Cell (${row}, ${col}). Phase: ${gamePhase}. Player: ${currentPlayer}.`);
+    if(selectedUnit) {
+        logMessage(`onCellClick: Selected ID: ${selectedUnit.id} (${selectedUnit.type.name}), Mvd: ${selectedUnit.movedThisTurn}, Atkd: ${selectedUnit.attackedThisTurn}`);
+    } else {
+        logMessage("onCellClick: No unit selected.");
+    }
+
+    const unitInClickedCell = getUnitAt(row, col);
+    if(unitInClickedCell) {
+        logMessage(`onCellClick: Unit in cell: ID ${unitInClickedCell.id} (${unitInClickedCell.type.name}), Owner: ${unitInClickedCell.owner}`);
+    } else {
+        logMessage("onCellClick: Clicked cell is empty.");
+    }
+
+    if (gamePhase === "unitSelection") {
+        logMessage("onCellClick: Phase 'unitSelection'.");
+        if (unitInClickedCell && unitInClickedCell.owner === currentPlayer) {
+            selectUnit(unitInClickedCell);
+        } else {
+            logMessage("onCellClick: Invalid selection click (no unit / not player's unit). Deselecting.");
+            if (selectedUnit) {
+                logMessage("onCellClick: (Deselecting previous unit).");
+            }
+            selectUnit(null);
+        }
+    } else if (gamePhase === "unitMovement" && selectedUnit) {
+        logMessage("onCellClick: Phase 'unitMovement'.");
+        if (unitInClickedCell) {
+            logMessage("onCellClick: Target cell has a unit.");
+            if (unitInClickedCell.owner !== currentPlayer && canAttack(selectedUnit, unitInClickedCell, false)) {
+                logMessage("onCellClick: Attempting attack.");
+                attackUnit(selectedUnit, unitInClickedCell);
+            } else if (unitInClickedCell.id === selectedUnit.id) {
+                logMessage("onCellClick: Clicked selected unit again. Deselecting.");
+                selectUnit(null);
+            } else if (unitInClickedCell.owner === currentPlayer) {
+                logMessage("onCellClick: Clicked another friendly unit. Switching selection.");
+                selectUnit(unitInClickedCell);
+            } else {
+                logMessage("onCellClick: Clicked unit, no valid action (not attackable, self, or other friendly).");
+            }
+        } else { // Clicked on an empty cell
+            logMessage(`onCellClick: Target cell empty. Attempting move to (${row}, ${col}).`);
+            if (!selectedUnit) { // Defensive check from previous debugging attempt
+                logMessage("onCellClick: CRITICAL - selectedUnit is null. Aborting move.");
+            } else if (canMoveTo(selectedUnit, row, col, false)) {
+                 logMessage("onCellClick: canMoveTo TRUE. Calling moveUnit.");
+                 moveUnit(selectedUnit, row, col);
+            } else {
+                logMessage("onCellClick: canMoveTo FALSE. Move not executed."); // Reasons in canMoveTo log
+            }
+        }
+    } else {
+        logMessage(`onCellClick: Unhandled. Phase: ${gamePhase}, SelUnit: ${selectedUnit ? selectedUnit.id : 'null'}`);
+    }
+    renderMap();
+    updateSelectedUnitInfo();
+}
+
+// --- DOMContentLoaded ---
+document.addEventListener('DOMContentLoaded', () => {
+    if (!gameBoardElement || !turnInfoElement || !selectedUnitInfoElement || !endTurnButton || !messageLogElement) {
+        console.error("CRITICAL DOM SETUP ERROR: Essential game elements missing.");
+        alert("خطای بارگذاری بازی! عناصر اصلی صفحه موجود نیستند.");
+        // Attempt to log to messageLog if it exists, otherwise, it's a lost cause.
+        if(typeof logMessage === "function") logMessage("خطای بسیار جدی: عناصر HTML اصلی بازی یافت نشدند!");
+        return;
+    }
+
+    logMessage("بازی در حال بارگذاری اولیه...");
+    initializeMapData();
+    initializeUnits();
+    renderMap();
+
+    const initialTurnText = `نوبت ${PLAYER_IRAN}`;
+    turnInfoElement.textContent = initialTurnText;
+    logMessage(`--- ${initialTurnText} ---`);
+    updateSelectedUnitInfo();
+
+    endTurnButton.addEventListener('click', () => {
+        if (currentPlayer === null) {
+             logMessage("endTurnButton: Game has ended.");
+             return;
+        }
+        logMessage(`${currentPlayer} نوبت خود را به پایان رساند.`);
+        switchTurn();
+    });
+    logMessage("بازی با موفقیت بارگذاری و آماده شد.");
+});
